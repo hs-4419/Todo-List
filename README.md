@@ -163,7 +163,11 @@ __1B+ todos__
 ...still running</br>
 tried a few times, evertime system got crashed after half an hour
 ![Resource Monitor](https://github.com/hs-4419/Todo-List/blob/main/Images/System%20crashed.png)
-
+__Indexing user_id column__
+```
+create index index_todos_user_id on todos(user_id);
+```
+![Indexing user_id column](https://github.com/hs-4419/Todo-List/blob/main/Images/Index%20building%20on%20users_id.png)
 
 ## 16) Query to find users who have not completed any of their todos within last month
 __Queries to add new column completed_at__
@@ -204,20 +208,53 @@ left join todos t ON u.id = t.user_id
 where t.user_id is null
 order by u.id;
 ```
-## 17) 
+## 17) Implement basic priority system
+>[!NOTE]
+>...In Progress
 ## 18) Query to track how many todos a user completes per week
-__Below query shows todos completed per week for last 4 weeks only__
+__Below query shows average todos completed for last 1 month only__
+
 ```
-select u.name, u.email, date_trunc('week', t.completed_at) as week_start, count(t.id) as todos_completed
-from users u
-left join todos t on u.id = t.user_id
-and t.status = 'completed'
-and t.completed_at is not null
-and t.completed_at >= now() - interval '4 weeks'
-group BY u.id, u.name, u.email, week_start
-order BY u.id, week_start desc;
+WITH weekly_counts AS (
+    SELECT 
+        u.id, u.name, u.email, 
+        date_trunc('week', t.completed_at) as week_start, 
+        count(t.id) as weekly_todos
+    FROM users u
+    LEFT JOIN todos t ON u.id = t.user_id
+        AND t.status = 'completed'
+        AND t.completed_at IS NOT NULL
+        AND t.completed_at >= now() - interval '4 weeks'
+    GROUP BY u.id, u.name, u.email, week_start
+)
 ```
-## 19) 
+```
+SELECT 
+    name, email,
+    ROUND(AVG(weekly_todos), 2) as avg_todos_per_week,
+    COUNT(*) as weeks_with_data,
+    SUM(weekly_todos) as total_completed
+FROM weekly_counts
+GROUP BY name, email
+ORDER BY avg_todos_per_week DESC;
+```
+## 19) Implemnting full text search and comparing the time
+__Before implementing full text search__
+![Querying without full text search](https://github.com/hs-4419/Todo-List/blob/main/Images/Full%20Text%20search%20without%20index.png)
+__Implementing full text search__
+```
+CREATE INDEX idx_todos_fulltext ON todos USING GIN (
+    to_tsvector('english', coalesce(title,'') || ' ' || coalesce(description,''))
+);
+```
+```
+SELECT * FROM public.todos 
+WHERE to_tsvector('english', coalesce(title,'') || ' ' || coalesce(description,'')) 
+      @@ plainto_tsquery('english', 'code');
+```
+
+__After implementing full text search__
+![Querying with full text search](https://github.com/hs-4419/Todo-List/blob/main/Images/Full%20Text%20search%20with%20index.png)
 
 
 
